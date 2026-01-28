@@ -37,23 +37,35 @@ export default async function TrackPage({
 
   return (
     <main>
-      <div className="stack">
-        <div className="card">
-          <h1>{qrCode.name}</h1>
-          <p>Target: {qrCode.targetUrl}</p>
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <span className="badge">Total visits: {totalVisits}</span>
-            <span className="badge">Status: {qrCode.isActive ? "Active" : "Paused"}</span>
-          </div>
-          <div style={{ marginTop: 16 }}>
+      <div className="page">
+        <section className="masthead">
+          <div className="masthead-top">
+            <div>
+              <div className="kicker">Tracking log</div>
+              <h1>{qrCode.name}</h1>
+              <p>Target: {qrCode.targetUrl}</p>
+            </div>
             <Link className="button secondary" href="/admin">
               Back to admin
             </Link>
           </div>
-        </div>
+          <div className="stats">
+            <div className="stat">
+              <span>Total visits</span>
+              <strong>{totalVisits}</strong>
+            </div>
+            <div className="stat">
+              <span>Status</span>
+              <strong>{qrCode.isActive ? "Active" : "Paused"}</strong>
+            </div>
+          </div>
+        </section>
 
-        <div className="card" style={{ overflowX: "auto" }}>
-          <h2>Recent visits</h2>
+        <section className="card section" style={{ overflowX: "auto" }}>
+          <div className="section-title">
+            <h2>Recent visits</h2>
+            <span className="kicker">Last 50</span>
+          </div>
           <table className="table">
             <thead>
               <tr>
@@ -80,7 +92,7 @@ export default async function TrackPage({
               )}
             </tbody>
           </table>
-        </div>
+        </section>
       </div>
     </main>
   );

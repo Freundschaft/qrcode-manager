@@ -104,23 +104,39 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
 
   return (
     <main>
-      <div className="stack">
-        <div className="card" style={{ display: "grid", gap: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
-            <h1>QR Codes</h1>
+      <div className="page">
+        <section className="masthead">
+          <div className="masthead-top">
+            <div>
+              <div className="kicker">Operations</div>
+              <h1>QR Fleet Control</h1>
+              <p>Manage links, track visits, and deploy new QR routes in seconds.</p>
+            </div>
             <button className="button secondary" onClick={() => signOut({ callbackUrl: "/" })}>
               Log out
             </button>
           </div>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-            <span className="badge">Total: {stats.total}</span>
-            <span className="badge">Active: {stats.active}</span>
-            <span className="badge">Visits: {stats.visits}</span>
+          <div className="stats">
+            <div className="stat">
+              <span>Total</span>
+              <strong>{stats.total}</strong>
+            </div>
+            <div className="stat">
+              <span>Active</span>
+              <strong>{stats.active}</strong>
+            </div>
+            <div className="stat">
+              <span>Visits</span>
+              <strong>{stats.visits}</strong>
+            </div>
           </div>
-        </div>
+        </section>
 
-        <div className="card" style={{ display: "grid", gap: 12 }}>
-          <h2>Create new QR code</h2>
+        <section className="card section">
+          <div className="section-title">
+            <h2>Create new QR code</h2>
+            <span className="kicker">Field notes</span>
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <input
               className="input"
@@ -147,21 +163,27 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
               onChange={(event) => setForm({ ...form, code: event.target.value })}
             />
           </div>
-          <button className="button" onClick={handleCreate} disabled={isPending}>
-            {isPending ? "Saving..." : "Create"}
-          </button>
-        </div>
+          <div>
+            <button className="button" onClick={handleCreate} disabled={isPending}>
+              {isPending ? "Saving..." : "Create"}
+            </button>
+          </div>
+        </section>
 
-        <div className="card" style={{ overflowX: "auto" }}>
-          <h2>Manage existing</h2>
+        <section className="card section" style={{ overflowX: "auto" }}>
+          <div className="section-title">
+            <h2>Manage existing</h2>
+            <span className="kicker">Active routes</span>
+          </div>
           <table className="table">
             <thead>
               <tr>
+                <th>Status</th>
                 <th>Name</th>
                 <th>Target URL</th>
                 <th>Friendly URL</th>
+                <th>QR</th>
                 <th>Code</th>
-                <th>Status</th>
                 <th>Visits</th>
                 <th>Actions</th>
               </tr>
@@ -173,7 +195,7 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
                 </tr>
               ) : (
                 items.map((item) => (
-                    <QRCodeRow
+                  <QRCodeRow
                     key={item.id}
                     item={item}
                     baseUrl={baseUrl}
@@ -184,7 +206,7 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
               )}
             </tbody>
           </table>
-        </div>
+        </section>
       </div>
     </main>
   );
@@ -211,30 +233,64 @@ function QRCodeRow({
   const publicLink = item.friendlySlug ? `/r/${item.friendlySlug}` : `/q/${item.code}`;
   const fullLink = baseUrl ? `${baseUrl}${publicLink}` : publicLink;
 
+  const copyTextFallback = (value: string) => {
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.style.position = "fixed";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+  };
+
   const copyLink = async () => {
-    await navigator.clipboard.writeText(fullLink);
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(fullLink);
+      return;
+    }
+    copyTextFallback(fullLink);
+  };
+
+  const ensureQr = async () => {
+    if (qrDataUrl) return qrDataUrl;
+    const dataUrl = await QRCode.toDataURL(fullLink, { width: 240, margin: 1 });
+    setQrDataUrl(dataUrl);
+    return dataUrl;
+  };
+
+  const dataUrlToBlob = async (dataUrl: string) => {
+    const response = await fetch(dataUrl);
+    return response.blob();
   };
 
   const copyQr = async () => {
     setQrBusy(true);
     try {
-      const dataUrl = await QRCode.toDataURL(fullLink, { width: 240, margin: 1 });
-      setQrDataUrl(dataUrl);
-      await navigator.clipboard.writeText(dataUrl);
+      const dataUrl = await ensureQr();
+      const clipboard = navigator.clipboard as Clipboard | undefined;
+      if (clipboard?.write) {
+        const blob = await dataUrlToBlob(dataUrl);
+        const item = new ClipboardItem({ [blob.type]: blob });
+        await clipboard.write([item]);
+        return;
+      }
+      if (clipboard?.writeText) {
+        await clipboard.writeText(dataUrl);
+        return;
+      }
+      copyTextFallback(dataUrl);
     } finally {
       setQrBusy(false);
     }
   };
 
-  const revealQr = async () => {
-    if (qrDataUrl) return;
-    setQrBusy(true);
-    try {
-      const dataUrl = await QRCode.toDataURL(fullLink, { width: 240, margin: 1 });
-      setQrDataUrl(dataUrl);
-    } finally {
-      setQrBusy(false);
-    }
+  const downloadQr = async () => {
+    const dataUrl = await ensureQr();
+    const link = document.createElement("a");
+    link.href = dataUrl;
+    link.download = `${item.code}.png`;
+    link.click();
   };
 
   const save = () => {
@@ -246,16 +302,25 @@ function QRCodeRow({
     setEditing(false);
   };
 
+  useEffect(() => {
+    void ensureQr();
+  }, [fullLink]);
+
   return (
     <tr>
-      <td>
+      <td data-label="Status">
+        <span className={`status-chip ${item.isActive ? "on" : "off"}`}>
+          {item.isActive ? "Active" : "Paused"}
+        </span>
+      </td>
+      <td data-label="Name">
         {editing ? (
           <input className="input" value={name} onChange={(event) => setName(event.target.value)} />
         ) : (
           <strong>{item.name}</strong>
         )}
       </td>
-      <td>
+      <td data-label="Target URL">
         {editing ? (
           <input
             className="input"
@@ -266,7 +331,7 @@ function QRCodeRow({
           <span>{item.targetUrl}</span>
         )}
       </td>
-      <td>
+      <td data-label="Friendly URL">
         {editing ? (
           <input
             className="input"
@@ -275,41 +340,98 @@ function QRCodeRow({
             placeholder="optional"
           />
         ) : (
-          <div style={{ display: "grid", gap: 6 }}>
-            <span>{publicLink}</span>
-            <span style={{ fontSize: "0.8rem", color: "#475569" }}>{fullLink}</span>
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <button className="button secondary" onClick={copyLink}>
-                Copy link
-              </button>
-              <button className="button secondary" onClick={copyQr} disabled={qrBusy}>
-                {qrBusy ? "Working..." : "Copy QR"}
-              </button>
-              <button className="button secondary" onClick={revealQr} disabled={qrBusy}>
-                {qrDataUrl ? "QR ready" : "Show QR"}
-              </button>
-            </div>
-            {qrDataUrl ? (
-              <img
-                src={qrDataUrl}
-                alt={`QR code for ${item.name}`}
-                style={{ width: 120, height: 120, borderRadius: 12, border: "1px solid #e2e8f0" }}
-              />
-            ) : null}
+          <div className="link-stack">
+            <button className="link-copy" onClick={copyLink} aria-label="Copy link">
+              <span className="link-copy-text">{fullLink}</span>
+              <span className="link-copy-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <rect
+                    x="9"
+                    y="9"
+                    width="10"
+                    height="10"
+                    rx="2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+                  <rect
+                    x="5"
+                    y="5"
+                    width="10"
+                    height="10"
+                    rx="2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+              </span>
+            </button>
           </div>
         )}
       </td>
-      <td>{item.code}</td>
-      <td>
-        <button
-          className={`button ${item.isActive ? "" : "secondary"}`}
-          onClick={() => onUpdate(item.id, { isActive: !item.isActive })}
-        >
-          {item.isActive ? "Active" : "Paused"}
-        </button>
+      <td data-label="QR">
+        {editing ? (
+          "—"
+        ) : (
+          <div className="link-stack">
+            {qrDataUrl ? (
+              <img src={qrDataUrl} alt={`QR code for ${item.name}`} className="qr-preview" />
+            ) : (
+              <div className="qr-preview" />
+            )}
+            <div className="actions">
+              <button className="icon-button" onClick={copyQr} disabled={qrBusy} aria-label="Copy QR">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect
+                    x="9"
+                    y="9"
+                    width="10"
+                    height="10"
+                    rx="2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+                  <rect
+                    x="5"
+                    y="5"
+                    width="10"
+                    height="10"
+                    rx="2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                  />
+                </svg>
+              </button>
+              <button className="icon-button" onClick={downloadQr} aria-label="Download QR">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M12 4v10m0 0 3-3m-3 3-3-3"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M4 18h16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
       </td>
-      <td>{item._count.visits}</td>
-      <td style={{ display: "flex", gap: 8 }}>
+      <td data-label="Code">{item.code}</td>
+      <td data-label="Visits">{item._count.visits}</td>
+      <td data-label="Actions" className="actions">
         {editing ? (
           <>
             <button className="button" onClick={save}>
@@ -321,8 +443,53 @@ function QRCodeRow({
           </>
         ) : (
           <>
-            <button className="button secondary" onClick={() => setEditing(true)}>
-              Edit
+            <button
+              className="icon-button"
+              onClick={() => onUpdate(item.id, { isActive: !item.isActive })}
+              aria-label={item.isActive ? "Deactivate" : "Activate"}
+              title={item.isActive ? "Deactivate" : "Activate"}
+            >
+              {item.isActive ? (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M2 12s4-6 10-6 10 6 10 6-4 6-10 6-10-6-10-6z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinejoin="round"
+                  />
+                  <circle cx="12" cy="12" r="3.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M3 3l18 18M2 12s4-6 10-6c2.1 0 4 .6 5.6 1.5M22 12s-4 6-10 6c-2.1 0-4-.6-5.6-1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
+            <button className="icon-button" onClick={() => setEditing(true)} aria-label="Edit">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 15.5V20h4.5L19 9.5l-4.5-4.5L4 15.5z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M14.5 5l4.5 4.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
             </button>
             <Link className="button secondary" href={`/admin/track/${item.id}`}>
               Track
