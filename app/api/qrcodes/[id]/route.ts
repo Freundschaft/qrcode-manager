@@ -4,7 +4,8 @@ import { NextResponse } from "next/server";
 import { authOptions } from "@/lib/auth";
 import { deleteQRCode, getVisitCount, updateQRCode } from "@/lib/qr-storage";
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -19,7 +20,7 @@ export async function PUT(request: Request, { params }: { params: { id: string }
 
   const updated = await updateQRCode({
     userId: session.user.id,
-    id: params.id,
+    id,
     name,
     targetUrl,
     friendlySlug,
@@ -38,13 +39,14 @@ export async function PUT(request: Request, { params }: { params: { id: string }
   return NextResponse.json({ ...updated, _count: { visits } });
 }
 
-export async function DELETE(_: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const deleted = await deleteQRCode(session.user.id, params.id);
+  const deleted = await deleteQRCode(session.user.id, id);
   if (!deleted) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
