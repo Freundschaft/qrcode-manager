@@ -26,7 +26,43 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #f3f4f6;
+  background-color: #0c4f7c;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.28), transparent 42%),
+    radial-gradient(circle at 38% 6%, rgba(255, 255, 255, 0.2), transparent 46%),
+    radial-gradient(circle at 72% 14%, rgba(255, 255, 255, 0.18), transparent 44%),
+    radial-gradient(circle at 88% 28%, rgba(255, 255, 255, 0.22), transparent 48%),
+    repeating-radial-gradient(
+      circle at 20% 30%,
+      rgba(255, 255, 255, 0.18) 0,
+      rgba(255, 255, 255, 0.18) 2px,
+      rgba(0, 0, 0, 0) 6px,
+      rgba(0, 0, 0, 0) 34px
+    ),
+    repeating-radial-gradient(
+      circle at 70% 60%,
+      rgba(255, 255, 255, 0.12) 0,
+      rgba(255, 255, 255, 0.12) 2px,
+      rgba(0, 0, 0, 0) 7px,
+      rgba(0, 0, 0, 0) 38px
+    ),
+    repeating-linear-gradient(
+      -12deg,
+      rgba(255, 255, 255, 0.14) 0,
+      rgba(255, 255, 255, 0.14) 1px,
+      rgba(0, 0, 0, 0) 1px,
+      rgba(0, 0, 0, 0) 28px
+    ),
+    repeating-linear-gradient(
+      9deg,
+      rgba(255, 255, 255, 0.08) 0,
+      rgba(255, 255, 255, 0.08) 1px,
+      rgba(0, 0, 0, 0) 1px,
+      rgba(0, 0, 0, 0) 34px
+    ),
+    linear-gradient(180deg, #0c5f93 0%, #0b4f7b 45%, #0a456b 100%);
+  background-blend-mode: screen, screen, screen, screen, overlay, overlay, overlay, overlay, normal;
+  background-attachment: fixed;
 }
 
 a {
@@ -228,6 +264,7 @@ p {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  position: relative;
 }
 
 .icon-button {
@@ -258,6 +295,35 @@ p {
   opacity: 0.5;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+.download-menu {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  display: grid;
+  gap: 6px;
+  background: #fff;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 8px;
+  box-shadow: var(--shadow);
+  z-index: 2;
+}
+
+.download-menu button {
+  border: 0;
+  background: transparent;
+  padding: 6px 10px;
+  text-align: left;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.download-menu button:hover {
+  background: rgba(0, 31, 41, 0.08);
+  border-radius: 8px;
 }
 
 .link-stack {
@@ -305,6 +371,46 @@ p {
   border: 1px solid var(--stroke);
   background: white;
   padding: 8px;
+}
+
+.qr-preview-button {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.qr-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 100;
+}
+
+.qr-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 31, 41, 0.4);
+}
+
+.qr-modal-card {
+  position: relative;
+  z-index: 1;
+  background: #fff;
+  border-radius: 20px;
+  padding: 24px;
+  border: 1px solid var(--stroke);
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  box-shadow: var(--shadow);
+}
+
+.qr-modal-card img {
+  width: 280px;
+  height: 280px;
 }
 
 @media (max-width: 720px) {

@@ -36,6 +36,7 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
   const [form, setForm] = useState<QRCodeForm>(emptyForm);
   const [isPending, startTransition] = useTransition();
   const [baseUrl, setBaseUrl] = useState<string>("");
+  const [activeQr, setActiveQr] = useState<{ src: string; name: string } | null>(null);
 
   useEffect(() => {
     setBaseUrl(window.location.origin);
@@ -105,11 +106,22 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
   return (
     <main>
       <div className="page">
+        {activeQr ? (
+          <div className="qr-modal" role="dialog" aria-modal="true">
+            <button className="qr-modal-backdrop" onClick={() => setActiveQr(null)} aria-label="Close" />
+            <div className="qr-modal-card">
+              <h2>{activeQr.name}</h2>
+              <img src={activeQr.src} alt={`QR code for ${activeQr.name}`} />
+              <button className="button secondary" onClick={() => setActiveQr(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        ) : null}
         <section className="masthead">
           <div className="masthead-top">
             <div>
-              <div className="kicker">Operations</div>
-              <h1>QR Fleet Control</h1>
+              <h1>QR Code Manager</h1>
               <p>Manage links, track visits, and deploy new QR routes in seconds.</p>
             </div>
             <button className="button secondary" onClick={() => signOut({ callbackUrl: "/" })}>
@@ -135,7 +147,6 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
         <section className="card section">
           <div className="section-title">
             <h2>Create new QR code</h2>
-            <span className="kicker">Field notes</span>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
             <input
@@ -173,7 +184,6 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
         <section className="card section" style={{ overflowX: "auto" }}>
           <div className="section-title">
             <h2>Manage existing</h2>
-            <span className="kicker">Active routes</span>
           </div>
           <table className="table">
             <thead>
@@ -199,6 +209,7 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
                     key={item.id}
                     item={item}
                     baseUrl={baseUrl}
+                    onOpenQr={(src, name) => setActiveQr({ src, name })}
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
                   />
@@ -215,11 +226,13 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
 function QRCodeRow({
   item,
   baseUrl,
+  onOpenQr,
   onUpdate,
   onDelete
 }: {
   item: QRCodeRecord;
   baseUrl: string;
+  onOpenQr: (src: string, name: string) => void;
   onUpdate: (id: string, updates: Partial<QRCodeRecord>) => void;
   onDelete: (id: string) => void;
 }) {
@@ -229,6 +242,7 @@ function QRCodeRow({
   const [friendlySlug, setFriendlySlug] = useState(item.friendlySlug ?? "");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [qrBusy, setQrBusy] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
 
   const publicLink = item.friendlySlug ? `/r/${item.friendlySlug}` : `/q/${item.code}`;
   const fullLink = baseUrl ? `${baseUrl}${publicLink}` : publicLink;
@@ -285,12 +299,48 @@ function QRCodeRow({
     }
   };
 
-  const downloadQr = async () => {
-    const dataUrl = await ensureQr();
+  const downloadQr = async (format: "png" | "jpg" | "svg") => {
+    let href = "";
+    let extension = format;
+
+    if (format === "png") {
+      href = await ensureQr();
+    }
+
+    if (format === "jpg") {
+      const dataUrl = await ensureQr();
+      const image = new Image();
+      image.src = dataUrl;
+      await new Promise((resolve, reject) => {
+        image.onload = resolve;
+        image.onerror = reject;
+      });
+      const canvas = document.createElement("canvas");
+      canvas.width = image.width;
+      canvas.height = image.height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(image, 0, 0);
+        href = canvas.toDataURL("image/jpeg", 0.92);
+      }
+    }
+
+    if (format === "svg") {
+      const svg = await QRCode.toString(fullLink, { type: "svg", margin: 1 });
+      const blob = new Blob([svg], { type: "image/svg+xml" });
+      href = URL.createObjectURL(blob);
+    }
+
     const link = document.createElement("a");
-    link.href = dataUrl;
-    link.download = `${item.code}.png`;
+    link.href = href;
+    link.download = `${item.code}.${extension}`;
     link.click();
+
+    if (format === "svg") {
+      URL.revokeObjectURL(href);
+    }
   };
 
   const save = () => {
@@ -377,7 +427,9 @@ function QRCodeRow({
         ) : (
           <div className="link-stack">
             {qrDataUrl ? (
-              <img src={qrDataUrl} alt={`QR code for ${item.name}`} className="qr-preview" />
+              <button className="qr-preview-button" onClick={() => onOpenQr(qrDataUrl, item.name)}>
+                <img src={qrDataUrl} alt={`QR code for ${item.name}`} className="qr-preview" />
+              </button>
             ) : (
               <div className="qr-preview" />
             )}
@@ -406,7 +458,11 @@ function QRCodeRow({
                   />
                 </svg>
               </button>
-              <button className="icon-button" onClick={downloadQr} aria-label="Download QR">
+              <button
+                className="icon-button"
+                onClick={() => setShowDownloadMenu((prev) => !prev)}
+                aria-label="Download QR"
+              >
                 <svg viewBox="0 0 24 24" aria-hidden="true">
                   <path
                     d="M12 4v10m0 0 3-3m-3 3-3-3"
@@ -425,6 +481,13 @@ function QRCodeRow({
                   />
                 </svg>
               </button>
+              {showDownloadMenu ? (
+                <div className="download-menu">
+                  <button onClick={() => downloadQr("png")}>PNG</button>
+                  <button onClick={() => downloadQr("jpg")}>JPG</button>
+                  <button onClick={() => downloadQr("svg")}>SVG</button>
+                </div>
+              ) : null}
             </div>
           </div>
         )}
