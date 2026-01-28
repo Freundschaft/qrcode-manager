@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import QRCode from "qrcode";
 
@@ -21,22 +21,22 @@ type QRCodeForm = {
   name: string;
   targetUrl: string;
   friendlySlug: string;
-  code: string;
 };
 
 const emptyForm: QRCodeForm = {
   name: "",
   targetUrl: "",
-  friendlySlug: "",
-  code: ""
+  friendlySlug: ""
 };
 
 export default function AdminClient({ initialData }: { initialData: QRCodeRecord[] }) {
+  const { data: session } = useSession();
   const [items, setItems] = useState<QRCodeRecord[]>(initialData);
   const [form, setForm] = useState<QRCodeForm>(emptyForm);
   const [isPending, startTransition] = useTransition();
   const [baseUrl, setBaseUrl] = useState<string>("");
   const [activeQr, setActiveQr] = useState<{ src: string; name: string } | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     setBaseUrl(window.location.origin);
@@ -51,18 +51,20 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
 
   const handleCreate = () => {
     startTransition(async () => {
+      setFormError(null);
       const response = await fetch("/api/qrcodes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: form.name,
           targetUrl: form.targetUrl,
-          friendlySlug: form.friendlySlug || null,
-          code: form.code || null
+          friendlySlug: form.friendlySlug || null
         })
       });
 
       if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        setFormError(error?.error ?? "Unable to create QR code.");
         return;
       }
 
@@ -74,6 +76,7 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
 
   const handleUpdate = (id: string, updates: Partial<QRCodeRecord>) => {
     startTransition(async () => {
+      setFormError(null);
       const response = await fetch(`/api/qrcodes/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -81,6 +84,8 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
       });
 
       if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        setFormError(error?.error ?? "Unable to update QR code.");
         return;
       }
 
@@ -91,11 +96,14 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
 
   const handleDelete = (id: string) => {
     startTransition(async () => {
+      setFormError(null);
       const response = await fetch(`/api/qrcodes/${id}`, {
         method: "DELETE"
       });
 
       if (!response.ok) {
+        const error = await response.json().catch(() => null);
+        setFormError(error?.error ?? "Unable to delete QR code.");
         return;
       }
 
@@ -124,9 +132,14 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
               <h1>QR Code Manager</h1>
               <p>Manage links, track visits, and deploy new QR routes in seconds.</p>
             </div>
+            <div style={{ display: "grid", gap: 6, justifyItems: "end" }}>
+              <span style={{ fontSize: "0.85rem", color: "var(--ink-soft)" }}>
+                Logged in as {session?.user?.email ?? "user"}
+              </span>
             <button className="button secondary" onClick={() => signOut({ callbackUrl: "/" })}>
               Log out
             </button>
+            </div>
           </div>
           <div className="stats">
             <div className="stat">
@@ -167,17 +180,16 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
               value={form.friendlySlug}
               onChange={(event) => setForm({ ...form, friendlySlug: event.target.value })}
             />
-            <input
-              className="input"
-              placeholder="Custom code (optional)"
-              value={form.code}
-              onChange={(event) => setForm({ ...form, code: event.target.value })}
-            />
           </div>
-          <div>
+          <div className="form-footer">
             <button className="button" onClick={handleCreate} disabled={isPending}>
               {isPending ? "Saving..." : "Create"}
             </button>
+            {formError ? (
+              <span className="form-error" role="alert">
+                {formError}
+              </span>
+            ) : null}
           </div>
         </section>
 

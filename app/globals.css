@@ -297,6 +297,19 @@ p {
   box-shadow: none;
 }
 
+.form-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.form-error {
+  color: #7a1b12;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
 .download-menu {
   position: absolute;
   right: 0;
