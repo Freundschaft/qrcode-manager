@@ -193,7 +193,6 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
                 <th>Target URL</th>
                 <th>Friendly URL</th>
                 <th>QR</th>
-                <th>Code</th>
                 <th>Visits</th>
                 <th>Actions</th>
               </tr>
@@ -378,7 +377,51 @@ function QRCodeRow({
             onChange={(event) => setTargetUrl(event.target.value)}
           />
         ) : (
-          <span>{item.targetUrl}</span>
+          <button
+            className="link-copy"
+            onClick={async () => {
+              const value = item.targetUrl;
+              if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(value);
+                return;
+              }
+              const textarea = document.createElement("textarea");
+              textarea.value = value;
+              textarea.style.position = "fixed";
+              textarea.style.left = "-9999px";
+              document.body.appendChild(textarea);
+              textarea.select();
+              document.execCommand("copy");
+              textarea.remove();
+            }}
+            aria-label="Copy target URL"
+          >
+            <span className="link-copy-text">{item.targetUrl}</span>
+            <span className="link-copy-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <rect
+                  x="9"
+                  y="9"
+                  width="10"
+                  height="10"
+                  rx="2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <rect
+                  x="5"
+                  y="5"
+                  width="10"
+                  height="10"
+                  rx="2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+              </svg>
+            </span>
+          </button>
         )}
       </td>
       <td data-label="Friendly URL">
@@ -554,11 +597,17 @@ function QRCodeRow({
                 />
               </svg>
             </button>
-            <Link className="button secondary" href={`/admin/track/${item.id}`}>
-              Track
-            </Link>
-            <button className="button secondary" onClick={() => onDelete(item.id)}>
-              Delete
+            <button className="icon-button" onClick={() => onDelete(item.id)} aria-label="Delete">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 7h16M9 7V5h6v2m-8 3v8m4-8v8m4-8v8M6 7l1 12h10l1-12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
           </>
         )}
