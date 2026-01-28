@@ -18,7 +18,6 @@ For local development with Netlify Blobs, set `NETLIFY_SITE_ID` and `NETLIFY_AUT
 
 ## Key URLs
 - Admin: `/admin`
-- Login: `/login`
 - Public redirect (friendly slug): `/r/{slug}`
 - Public redirect (code): `/q/{code}`
 

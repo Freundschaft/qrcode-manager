@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, useTransition } from "react";
+import { signOut } from "next-auth/react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import QRCode from "qrcode";
 
 type QRCodeRecord = {
   id: string;
@@ -33,6 +35,11 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
   const [items, setItems] = useState<QRCodeRecord[]>(initialData);
   const [form, setForm] = useState<QRCodeForm>(emptyForm);
   const [isPending, startTransition] = useTransition();
+  const [baseUrl, setBaseUrl] = useState<string>("");
+
+  useEffect(() => {
+    setBaseUrl(window.location.origin);
+  }, []);
 
   const stats = useMemo(() => {
     const total = items.length;
@@ -99,7 +106,12 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
     <main>
       <div className="stack">
         <div className="card" style={{ display: "grid", gap: 12 }}>
-          <h1>QR Codes</h1>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <h1>QR Codes</h1>
+            <button className="button secondary" onClick={() => signOut({ callbackUrl: "/" })}>
+              Log out
+            </button>
+          </div>
           <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
             <span className="badge">Total: {stats.total}</span>
             <span className="badge">Active: {stats.active}</span>
@@ -161,9 +173,10 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
                 </tr>
               ) : (
                 items.map((item) => (
-                  <QRCodeRow
+                    <QRCodeRow
                     key={item.id}
                     item={item}
+                    baseUrl={baseUrl}
                     onUpdate={handleUpdate}
                     onDelete={handleDelete}
                   />
@@ -179,10 +192,12 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
 
 function QRCodeRow({
   item,
+  baseUrl,
   onUpdate,
   onDelete
 }: {
   item: QRCodeRecord;
+  baseUrl: string;
   onUpdate: (id: string, updates: Partial<QRCodeRecord>) => void;
   onDelete: (id: string) => void;
 }) {
@@ -190,8 +205,37 @@ function QRCodeRow({
   const [name, setName] = useState(item.name);
   const [targetUrl, setTargetUrl] = useState(item.targetUrl);
   const [friendlySlug, setFriendlySlug] = useState(item.friendlySlug ?? "");
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [qrBusy, setQrBusy] = useState(false);
 
   const publicLink = item.friendlySlug ? `/r/${item.friendlySlug}` : `/q/${item.code}`;
+  const fullLink = baseUrl ? `${baseUrl}${publicLink}` : publicLink;
+
+  const copyLink = async () => {
+    await navigator.clipboard.writeText(fullLink);
+  };
+
+  const copyQr = async () => {
+    setQrBusy(true);
+    try {
+      const dataUrl = await QRCode.toDataURL(fullLink, { width: 240, margin: 1 });
+      setQrDataUrl(dataUrl);
+      await navigator.clipboard.writeText(dataUrl);
+    } finally {
+      setQrBusy(false);
+    }
+  };
+
+  const revealQr = async () => {
+    if (qrDataUrl) return;
+    setQrBusy(true);
+    try {
+      const dataUrl = await QRCode.toDataURL(fullLink, { width: 240, margin: 1 });
+      setQrDataUrl(dataUrl);
+    } finally {
+      setQrBusy(false);
+    }
+  };
 
   const save = () => {
     onUpdate(item.id, {
@@ -231,7 +275,28 @@ function QRCodeRow({
             placeholder="optional"
           />
         ) : (
-          <span>{publicLink}</span>
+          <div style={{ display: "grid", gap: 6 }}>
+            <span>{publicLink}</span>
+            <span style={{ fontSize: "0.8rem", color: "#475569" }}>{fullLink}</span>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="button secondary" onClick={copyLink}>
+                Copy link
+              </button>
+              <button className="button secondary" onClick={copyQr} disabled={qrBusy}>
+                {qrBusy ? "Working..." : "Copy QR"}
+              </button>
+              <button className="button secondary" onClick={revealQr} disabled={qrBusy}>
+                {qrDataUrl ? "QR ready" : "Show QR"}
+              </button>
+            </div>
+            {qrDataUrl ? (
+              <img
+                src={qrDataUrl}
+                alt={`QR code for ${item.name}`}
+                style={{ width: 120, height: 120, borderRadius: 12, border: "1px solid #e2e8f0" }}
+              />
+            ) : null}
+          </div>
         )}
       </td>
       <td>{item.code}</td>

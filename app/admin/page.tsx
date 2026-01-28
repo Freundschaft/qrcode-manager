@@ -8,7 +8,7 @@ import { listQRCodesForUser } from "@/lib/qr-storage";
 export default async function AdminPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    redirect("/login");
+    redirect("/auth?callbackUrl=/admin");
   }
 
   const qrCodes = await listQRCodesForUser(session.user.id);

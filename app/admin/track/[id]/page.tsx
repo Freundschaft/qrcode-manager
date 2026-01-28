@@ -5,13 +5,18 @@ import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { getQRCodeForUser, getVisitCount, listRecentVisits } from "@/lib/qr-storage";
 
-export default async function TrackPage({ params }: { params: { id: string } }) {
+export default async function TrackPage({
+  params
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
-    redirect("/login");
+    redirect(`/auth?callbackUrl=/admin/track/${id}`);
   }
 
-  const found = await getQRCodeForUser(session.user.id, params.id);
+  const found = await getQRCodeForUser(session.user.id, id);
   const qrCode = found?.record ?? null;
 
   if (!qrCode) {
