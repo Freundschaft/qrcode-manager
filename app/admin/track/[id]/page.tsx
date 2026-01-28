@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { authOptions } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import { getQRCodeForUser, getVisitCount, listRecentVisits } from "@/lib/qr-storage";
 
 export default async function TrackPage({ params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -11,16 +11,8 @@ export default async function TrackPage({ params }: { params: { id: string } }) 
     redirect("/login");
   }
 
-  const qrCode = await prisma.qRCode.findFirst({
-    where: { id: params.id, createdById: session.user.id },
-    include: {
-      visits: {
-        orderBy: { visitedAt: "desc" },
-        take: 50
-      },
-      _count: { select: { visits: true } }
-    }
-  });
+  const found = await getQRCodeForUser(session.user.id, params.id);
+  const qrCode = found?.record ?? null;
 
   if (!qrCode) {
     return (
@@ -35,6 +27,9 @@ export default async function TrackPage({ params }: { params: { id: string } }) 
     );
   }
 
+  const visits = await listRecentVisits(qrCode.id, 50);
+  const totalVisits = await getVisitCount(qrCode.id);
+
   return (
     <main>
       <div className="stack">
@@ -42,7 +37,7 @@ export default async function TrackPage({ params }: { params: { id: string } }) 
           <h1>{qrCode.name}</h1>
           <p>Target: {qrCode.targetUrl}</p>
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-            <span className="badge">Total visits: {qrCode._count.visits}</span>
+            <span className="badge">Total visits: {totalVisits}</span>
             <span className="badge">Status: {qrCode.isActive ? "Active" : "Paused"}</span>
           </div>
           <div style={{ marginTop: 16 }}>
@@ -64,14 +59,14 @@ export default async function TrackPage({ params }: { params: { id: string } }) 
               </tr>
             </thead>
             <tbody>
-              {qrCode.visits.length === 0 ? (
+              {visits.length === 0 ? (
                 <tr>
                   <td colSpan={4}>No visits recorded yet.</td>
                 </tr>
               ) : (
-                qrCode.visits.map((visit) => (
+                visits.map((visit) => (
                   <tr key={visit.id}>
-                    <td>{visit.visitedAt.toISOString()}</td>
+                    <td>{visit.visitedAt}</td>
                     <td>{visit.userAgent ?? "—"}</td>
                     <td>{visit.referrer ?? "—"}</td>
                     <td>{visit.ipHash ?? "—"}</td>

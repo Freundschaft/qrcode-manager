@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 
-import prisma from "@/lib/prisma";
-import { hashIp } from "@/lib/qrcode";
+import { findQRCodeByCodeOrSlug, recordVisit } from "@/lib/qr-storage";
 
 export async function handleRedirect(where: { friendlySlug?: string; code?: string }, request: Request) {
-  const qr = await prisma.qRCode.findFirst({ where });
+  const qr = await findQRCodeByCodeOrSlug({
+    slug: where.friendlySlug,
+    code: where.code
+  });
 
   if (!qr) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -19,13 +21,11 @@ export async function handleRedirect(where: { friendlySlug?: string; code?: stri
   const userAgent = request.headers.get("user-agent");
   const referrer = request.headers.get("referer");
 
-  await prisma.qRVisit.create({
-    data: {
-      qrCodeId: qr.id,
-      userAgent,
-      referrer,
-      ipHash: hashIp(ip)
-    }
+  await recordVisit({
+    qrCodeId: qr.id,
+    userAgent,
+    referrer,
+    ip
   });
 
   return NextResponse.redirect(qr.targetUrl, { status: 302 });

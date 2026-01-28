@@ -2,8 +2,7 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
 import { authOptions } from "@/lib/auth";
-import prisma from "@/lib/prisma";
-import { generateCode } from "@/lib/qrcode";
+import { createQRCode, listQRCodesForUser } from "@/lib/qr-storage";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -11,12 +10,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const qrCodes = await prisma.qRCode.findMany({
-    where: { createdById: session.user.id },
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { visits: true } } }
-  });
-
+  const qrCodes = await listQRCodesForUser(session.user.id);
   return NextResponse.json(qrCodes);
 }
 
@@ -30,22 +24,29 @@ export async function POST(request: Request) {
   const name = String(body.name ?? "").trim();
   const targetUrl = String(body.targetUrl ?? "").trim();
   const friendlySlug = body.friendlySlug ? String(body.friendlySlug).trim() : null;
-  const code = body.code ? String(body.code).trim() : generateCode(10);
+  const code = body.code ? String(body.code).trim() : null;
 
   if (!name || !targetUrl) {
     return NextResponse.json({ error: "Name and targetUrl are required" }, { status: 400 });
   }
 
-  const created = await prisma.qRCode.create({
-    data: {
-      name,
-      targetUrl,
-      friendlySlug: friendlySlug || null,
-      code,
-      createdById: session.user.id
-    },
-    include: { _count: { select: { visits: true } } }
+  const result = await createQRCode({
+    userId: session.user.id,
+    name,
+    targetUrl,
+    friendlySlug,
+    code
   });
 
-  return NextResponse.json(created, { status: 201 });
+  if ("error" in result) {
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  }
+
+  return NextResponse.json(
+    {
+      ...result.record,
+      _count: { visits: result.stats.visits }
+    },
+    { status: 201 }
+  );
 }
