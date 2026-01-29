@@ -28,5 +28,10 @@ export async function handleRedirect(where: { friendlySlug?: string; code?: stri
     ip
   });
 
-  return NextResponse.redirect(qr.targetUrl, { status: 302 });
+  const response = NextResponse.redirect(qr.targetUrl, { status: 302 });
+  response.headers.set(
+    "Cache-Control",
+    "public, max-age=60, s-maxage=300, stale-while-revalidate=300"
+  );
+  return response;
 }
