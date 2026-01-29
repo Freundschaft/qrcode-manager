@@ -2,6 +2,7 @@ import { getStore } from "@netlify/blobs";
 import { randomUUID } from "crypto";
 
 import { generateCode, hashIp } from "./qrcode";
+import { validateTargetUrl } from "./validation";
 
 export type QRCodeRecord = {
   id: string;
@@ -121,6 +122,12 @@ export async function createQRCode(params: {
   const now = new Date().toISOString();
   const code = (params.code ?? "").trim() || generateCode(10);
   const friendlySlug = params.friendlySlug?.trim() || null;
+  const targetUrl = params.targetUrl.trim();
+
+  const validation = validateTargetUrl(targetUrl);
+  if (!validation.ok) {
+    return { error: validation.error, status: 400 } as const;
+  }
 
   const codeKey = buildCodeKey(code);
   const existingCode = await indexStore().get(codeKey, { type: "json" });
@@ -140,7 +147,7 @@ export async function createQRCode(params: {
     id,
     name: params.name,
     code,
-    targetUrl: params.targetUrl,
+    targetUrl,
     friendlySlug,
     isActive: true,
     createdById: params.userId,
@@ -195,10 +202,18 @@ export async function updateQRCode(params: {
     }
   }
 
+  const targetUrl = params.targetUrl?.trim() ?? record.targetUrl;
+  if (params.targetUrl !== undefined) {
+    const validation = validateTargetUrl(targetUrl);
+    if (!validation.ok) {
+      return { error: validation.error, status: 400 } as const;
+    }
+  }
+
   const updated: QRCodeRecord = {
     ...record,
     name: params.name ?? record.name,
-    targetUrl: params.targetUrl ?? record.targetUrl,
+    targetUrl,
     friendlySlug: nextSlug ?? null,
     isActive: params.isActive ?? record.isActive,
     updatedAt: new Date().toISOString()

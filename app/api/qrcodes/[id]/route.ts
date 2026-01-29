@@ -2,9 +2,13 @@ import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 
 import { authOptions } from "@/lib/auth";
+import { requireCsrf } from "@/lib/csrf";
 import { deleteQRCode, getVisitCount, updateQRCode } from "@/lib/qr-storage";
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
+  const csrfError = await requireCsrf(request);
+  if (csrfError) return csrfError;
+
   const { id } = await context.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -40,6 +44,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 }
 
 export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const csrfError = await requireCsrf(_);
+  if (csrfError) return csrfError;
+
   const { id } = await context.params;
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {

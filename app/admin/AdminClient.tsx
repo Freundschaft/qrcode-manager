@@ -31,6 +31,7 @@ const emptyForm: QRCodeForm = {
 
 export default function AdminClient({ initialData }: { initialData: QRCodeRecord[] }) {
   const { data: session } = useSession();
+  const csrfToken = session?.csrf ?? "";
   const [items, setItems] = useState<QRCodeRecord[]>(initialData);
   const [form, setForm] = useState<QRCodeForm>(emptyForm);
   const [isPending, startTransition] = useTransition();
@@ -54,7 +55,7 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
       setFormError(null);
       const response = await fetch("/api/qrcodes", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
         body: JSON.stringify({
           name: form.name,
           targetUrl: form.targetUrl,
@@ -79,7 +80,7 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
       setFormError(null);
       const response = await fetch(`/api/qrcodes/${id}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-CSRF-Token": csrfToken },
         body: JSON.stringify(updates)
       });
 
@@ -98,7 +99,8 @@ export default function AdminClient({ initialData }: { initialData: QRCodeRecord
     startTransition(async () => {
       setFormError(null);
       const response = await fetch(`/api/qrcodes/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: { "X-CSRF-Token": csrfToken }
       });
 
       if (!response.ok) {
